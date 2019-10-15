@@ -47,7 +47,7 @@ a2 = fit[2]
 a3 = fit[1]
 a4 = fit[0]
 
-freqfull = np.linspace(freq2[0], freq2[-1], 1e5)
+freqfull = np.linspace(freq2[0], freq2[-1], 1e2)
 
 skymod = a0 + a1*freqfull + a2*freqfull**2 + a3*freqfull**3 + a4*freqfull**4
 
@@ -62,7 +62,7 @@ plt.title("Bowman et al. Sky Data")
 def gaussian(x, x0, A, sigma): #defines gaussian absorption feature
     return (1/(np.sqrt(2*pi*sigma**2)))*A*np.exp((-(x-x0)**2)/(2*sigma**2))
 
-hsigmod = - gaussian(freqfull, 78.0, 1, 8.1) #gaussian with parameters comparable to Bowman et al.
+hsigmod = - gaussian(freqfull, 78.0, 100, 0.1*8.1) #gaussian with parameters comparable to Bowman et al.
 
 plt.figure()
 plt.plot(freqfull, hsigmod, 'b-')
@@ -102,7 +102,7 @@ def log_likelihood(theta, tant):
 
 def log_prior(theta):
     p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta
-    if 4e4 < p0 < 1e5 and -2e3 < p1 < 0 and 0 < p2 < 1e2 and -1 < p3 < 1 and -1e-3 < p4 < 1e-3 and 0 < amp < 2 and 50 < maxfreq < 90 and 3 < sighi < 10:
+    if 4e4 < p0 < 1e5 and -2e3 < p1 < 0 and 0 < p2 < 50 and -0.5 < p3 < 0.5 and 0 < p4 < 1e-3 and 0 < amp < 2 and 50 < maxfreq < 90 and 3 < sighi < 10:
         return 0.0
     return -np.inf
 
@@ -116,8 +116,10 @@ def log_probability(theta, freq, tant):
 pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8)
 nwalkers, ndim = pos.shape
 
+n_steps = 5000
+
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freqfull, tant))
-sampler.run_mcmc(pos, 100, progress=True)
+sampler.run_mcmc(pos, n_steps, progress=True)
 
 fig, axes = plt.subplots(8, figsize=(10, 8), sharex=True)
 samples = sampler.get_chain()
@@ -134,5 +136,17 @@ soln = minimize(nll, initial, args=(tant))
 tmod = soln.x
 print(tmod)
 """
-flat_samples = sampler.get_chain(discard=10, thin=1, flat=True)
+flat_samples = sampler.get_chain(discard=1000, thin=5, flat=True)
 fig = corner.corner(flat_samples)
+
+ff = freqfull
+s_inds = np.random.randint(len(flat_samples), size=100)
+plt.figure()
+plt.plot(freqfull, simsig, 'k', label = 'truth')
+for i in s_inds:
+    sp = flat_samples[i]
+    model = sp[0] + sp[1]*ff + sp[2]*ff**2 + sp[3]*ff**3 + sp[4]*ff**4 -gaussian(ff, sp[6], sp[5], sp[7])
+    plt.plot(freqfull, model, "g", alpha=0.1)
+plt.legend()
+plt.xlabel("Frequency [MHz]")
+plt.ylabel("Temp [K]")
