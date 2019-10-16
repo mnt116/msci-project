@@ -125,7 +125,7 @@ sampler.run_mcmc(pos, n_steps, progress=True)
 
 fig, axes = plt.subplots(8, figsize=(10, 8), sharex=True)
 samples = sampler.get_chain()
-labels = ["","","","","","",""]
+labels = ["a0","a1","a2","a3","a4","freq","amp","sigma"]
 for i in range(ndim):
     ax = axes[i]
     ax.plot(samples[:, :, i], "k", alpha=0.3)
@@ -140,7 +140,7 @@ tmod = soln.x
 print(tmod)
 """
 flat_samples = sampler.get_chain(discard=1000, thin=3, flat=True)
-fig = corner.corner(flat_samples)
+fig = corner.corner(flat_samples,labels=labels)
 plt.savefig("21cm_cornerplot.png")
 
 ff = freqfull
@@ -155,3 +155,5 @@ plt.legend()
 plt.xlabel("Frequency [MHz]")
 plt.ylabel("Temp [K]")
 plt.savefig("21cm_mcmcfit.png")
+
+
