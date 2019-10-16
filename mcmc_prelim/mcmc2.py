@@ -26,7 +26,7 @@ tsky = df["tsky"]
 #tres2 = df["tres2"]
         
 # finding form of foreground polynomial for simulated background
-N=15
+N=5
 freq1=[]
 for i in freqs:
     freq1.append(i)
@@ -47,7 +47,7 @@ a2 = fit[2]
 a3 = fit[1]
 a4 = fit[0]
 
-freqfull = np.linspace(freq2[0], freq2[-1], 1e2)
+freqfull = np.linspace(freq2[0], freq2[-1], 1e4)
 
 skymod = a0 + a1*freqfull + a2*freqfull**2 + a3*freqfull**3 + a4*freqfull**4
 
@@ -62,13 +62,14 @@ plt.title("Bowman et al. Sky Data")
 def gaussian(x, x0, A, sigma): #defines gaussian absorption feature
     return (1/(np.sqrt(2*pi*sigma**2)))*A*np.exp((-(x-x0)**2)/(2*sigma**2))
 
-hsigmod = - gaussian(freqfull, 78.0, 100, 0.1*8.1) #gaussian with parameters comparable to Bowman et al.
+hsigmod = - gaussian(freqfull, 78.0, 100, 0.1* 8.1) #gaussian with parameters comparable to Bowman et al.
 
 plt.figure()
 plt.plot(freqfull, hsigmod, 'b-')
 plt.xlabel("Freq [MHz]")
 plt.ylabel("Temp [K]")
 plt.title("Simulated 21cm Signal")
+plt.savefig("sim21cm.png")
 
 # full simulated signal
 simsig = skymod + hsigmod + np.random.normal(0, 0.001, len(freqfull)) #foreground + absorption dip + thermal noise
@@ -78,6 +79,7 @@ plt.plot(freqfull, simsig, 'r.')
 plt.xlabel("Freq [MHz]")
 plt.ylabel("Temp [K]")
 plt.title("Full Simulated Signal (to be measured)")
+plt.savefig("fullsimsig.png")
 
 # mcmc fitting
 tant = simsig
@@ -116,7 +118,7 @@ def log_probability(theta, freq, tant):
 pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8)
 nwalkers, ndim = pos.shape
 
-n_steps = 5000
+n_steps = 2000
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freqfull, tant))
 sampler.run_mcmc(pos, n_steps, progress=True)
@@ -128,6 +130,7 @@ for i in range(ndim):
     ax = axes[i]
     ax.plot(samples[:, :, i], "k", alpha=0.3)
     ax.set_xlim(0, len(samples))
+plt.savefig("21cm_burnin.png")
 
 """
 nll = lambda *args: -log_likelihood(*args)
@@ -136,8 +139,9 @@ soln = minimize(nll, initial, args=(tant))
 tmod = soln.x
 print(tmod)
 """
-flat_samples = sampler.get_chain(discard=1000, thin=5, flat=True)
+flat_samples = sampler.get_chain(discard=1000, thin=3, flat=True)
 fig = corner.corner(flat_samples)
+plt.savefig("21cm_cornerplot.png")
 
 ff = freqfull
 s_inds = np.random.randint(len(flat_samples), size=100)
@@ -150,3 +154,4 @@ for i in s_inds:
 plt.legend()
 plt.xlabel("Frequency [MHz]")
 plt.ylabel("Temp [K]")
+plt.savefig("21cm_mcmcfit.png")
