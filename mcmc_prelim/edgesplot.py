@@ -29,7 +29,6 @@ for i in range(0,5):
     ax.set_ylabel("Temp [K]")
     if i == 4:
         ax.set_xlabel("Frequency [MHz]")
-plt.savefig("bowman-plots.png")
         
 N=5
 freq2=freq[N:len(tsky)-N]
@@ -48,6 +47,5 @@ skymod = a0 + a1*freq2 + a2*freq2**2 + a3*freq2**3 + a4*freq2**4
 plt.figure()
 plt.plot(freq2, skymod, 'b-')
 plt.plot(freq2, tsky2, 'ro')
-plt.xlabel("Freq [MHz]")		
+plt.xlabel("Freq [MHz]")
 plt.ylabel("Temp [K]")
-plt.savefig("sim-foregd.png")
