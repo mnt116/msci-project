@@ -91,7 +91,7 @@ def log_likelihood(theta, freq, tant): # log likelihood function for model param
 
 def log_prior(theta): # defines (uniform) priors for model parameters theta
     p0, p1, p2, p3, p4 = theta # theta takes form of array of model parameters
-    if 0 < p0 < 1e5 and -2e4 < p1 < 0 and 0 < p2 < 100  and -5 < p3 < 5 and 0 < p4 < 1e-2: # uniform priors used for now
+    if 3e4 < p0 < 5e4 and -2e3 < p1 < -1e3 and 0 < p2 < 50  and -1 < p3 < 0 and 0 < p4 < 1e-3: # uniform priors used for now
         return 0.0 # corresponds to probability of 1
     return -np.inf # corresponds to probability of 0
 
