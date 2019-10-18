@@ -5,155 +5,150 @@ Created on Mon Oct 14 22:26:12 2019
 @author: matth
 """
 
+# SIM DATA
+plotsimdata = True # plot simulated data
+savesimdata = False # save plot of simulated data as simdata.png
+
+# BURN IN
+plotburnin = True # plot step-by-step progress of mcmc
+saveburnin = False # save plot of step-by-step progress of mcmc as 21cm_burnin.png
+
+# CORNER PLOT
+plotcorner = True # plot corner plot of mcmc results
+savecorner = False # save corner plot as 21cm_cornerplot.png
+ 
+# MODELS PLOT
+plotmodels = True # plot models vs simulated data for 100 random points in chain
+savemodels = False # save plot of models vs simulated data as 21cm_modelsplot.png
+
+# SAVE CHAIN
+savefullchain = False # choose whether or not to save full mcmc chain to fullchain.txt
+saveflatchain = False # choose whether or not to save flattened, thinned chain to flatchain.txt (parameters for discard and thin are set below)
+
 # importing modules
 from math import pi
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 import emcee
-from scipy.optimize import minimize
 import corner
 
-# importing EDGES data to simulate background
-df = pd.read_csv("edges_data.csv")
+# creating simulated foredground data using EDGES foreground; see edgesfit.py
+a0 = 47052.32658584365
+a1 = -1844.967333964787
+a2 = 29.265792826929875
+a3 = -0.21536464292060956
+a4 = 0.0006102144740830822
 
-freqs = df["freq"]
-#weight = df["weight"]
-#tmod = df["tmodel"]
-tsky = df["tsky"]
-#t21 = df["t21"]
-#tres1 = df["tres1"]
-#tres2 = df["tres2"]
-        
-# finding form of foreground polynomial for simulated background
-N=5
-freq1=[]
-for i in freqs:
-    freq1.append(i)
-freq1=np.array(freq1)
-freq2=freq1[N:len(tsky)-N]
+freqfull = np.linspace(51.965332, 97.668457, 50) # frequency linspace 
 
-tsky1=[]
-for i in tsky:
-    tsky1.append(i)
-tsky1=np.array(tsky1)
-tsky2=tsky1[N:len(tsky)-N]
-        
-fit = np.polyfit(freq2, tsky2, 4)
+simfore = a0 + a1*freqfull + a2*freqfull**2 + a3*freqfull**3 + a4*freqfull**4 # simulated foreground 
 
-a0 = fit[4]
-a1 = fit[3]
-a2 = fit[2]
-a3 = fit[1]
-a4 = fit[0]
-
-freqfull = np.linspace(freq2[0], freq2[-1], 1e4)
-
-skymod = a0 + a1*freqfull + a2*freqfull**2 + a3*freqfull**3 + a4*freqfull**4
-
-plt.figure()
-plt.plot(freq2, tsky2, 'ro')
-plt.plot(freqfull, skymod, 'b-')
-plt.xlabel("Freq [MHz]")
-plt.ylabel("Temp [K]")
-plt.title("Bowman et al. Sky Data")
-
-# finding form of 21cm signal
-def gaussian(x, x0, A, sigma): #defines gaussian absorption feature
+def gaussian(x, x0, A, sigma): # defines gaussian absorption feature
     return (1/(np.sqrt(2*pi*sigma**2)))*A*np.exp((-(x-x0)**2)/(2*sigma**2))
 
-hsigmod = - gaussian(freqfull, 78.0, 100, 0.1* 8.1) #gaussian with parameters comparable to Bowman et al.
+simh = - gaussian(freqfull, 78.0, 10, 8.1) # gaussian absorption dip with parameters comparable to Bowman et al.
+simsig = simfore + simh + np.random.normal(0, 0.001, len(freqfull)) # foreground + absorption dip + thermal noise
 
-plt.figure()
-plt.plot(freqfull, hsigmod, 'b-')
-plt.xlabel("Freq [MHz]")
-plt.ylabel("Temp [K]")
-plt.title("Simulated 21cm Signal")
-plt.savefig("sim21cm.png")
+if plotsimdata == True: # plot of simulated 21cm signal, foreground, and combined 
+    plt.figure()
+    plt.subplot(1,3,1)
+    plt.plot(freqfull, simh, 'r.')
+    plt.xlabel("Freq [MHz]")
+    plt.ylabel("Temp [K]")
+    plt.title("Simulated 21cm Signal")
 
-# full simulated signal
-simsig = skymod + hsigmod + np.random.normal(0, 0.001, len(freqfull)) #foreground + absorption dip + thermal noise
+    plt.subplot(1,3,2)
+    plt.plot(freqfull, simfore, 'r.')
+    plt.xlabel("Freq [MHz]")
+    plt.ylabel("Temp [K]")
+    plt.title("Simulated Foreground")
 
-plt.figure()
-plt.plot(freqfull, simsig, 'r.')
-plt.xlabel("Freq [MHz]")
-plt.ylabel("Temp [K]")
-plt.title("Full Simulated Signal (to be measured)")
-plt.savefig("fullsimsig.png")
+    plt.subplot(1,3,3)
+    plt.plot(freqfull, simsig, 'r.')
+    plt.xlabel("Freq [MHz]")
+    plt.ylabel("Temp [K]")
+    plt.title("Full Simulated Signal (to be measured)")
+
+    if savesimdata == True:
+        plt.savefig("simdata.png")
 
 # mcmc fitting
-tant = simsig
+tant = simsig # defines antenna temperature measurements, equal to simsig here
 
-def log_likelihood(theta, tant):
-    p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta
-    coeffs = [p0,p1,p2,p3,p4]
-    T_f=[]
-    for j in range(0, len(freqfull)):
-        terms = []
-        for i in range(0,5):
-            terms.append(coeffs[i]*(freqfull[j])**i)
-        T_f.append(np.sum(terms))
-    T_hi = amp*np.exp(- (freqfull-maxfreq)**2 / (2*sighi**2))
-    model = T_f + T_hi
-    #sigma = tant/(np.sqrt(19*60*0.391)) #this was too big/idk why it's here
+def log_likelihood(theta, freq, tant): # log likelihood function for model parameters theta and antenna temperature measurements tant
+    p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta # theta takes form of array of model parameters
+    coeffs = [p0,p1,p2,p3,p4] # coefficients of model foreground polynomial
+    freq_arr = np.transpose(np.multiply.outer(np.full(5,1), freq))
+    pwrs = np.power(freq_arr, [0,1,2,3,4])
+    ctp = coeffs*pwrs
+    T_f = np.sum(ctp,(1)) # model foreground temperature
+    T_hi = amp*np.exp(- (freq-maxfreq)**2 / (2*sighi**2)) # model 21cm temperature
+    model = T_f + T_hi # total model temperature
     coeff = 1/(np.sqrt(2*pi*sighi**2))
-    numerator = (tant - model)**2
+    numerator = (tant - model)**2 # likelihood depends on difference between model and observed temperature in each frequency bin
     denominator = 2*sighi**2
-    lj = coeff*np.exp(-numerator/denominator)
-    return np.sum(np.log(lj))
+    lj = coeff*np.exp(-numerator/denominator) 
+    return np.sum(np.log(lj)) # sum over all frequency bins
 
-def log_prior(theta):
-    p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta
-    if 4e4 < p0 < 1e5 and -2e3 < p1 < 0 and 0 < p2 < 50 and -0.5 < p3 < 0.5 and 0 < p4 < 1e-3 and 0 < amp < 2 and 50 < maxfreq < 90 and 3 < sighi < 10:
-        return 0.0
-    return -np.inf
+def log_prior(theta): # defines (uniform) priors for model parameters theta
+    p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta # theta takes form of array of model parameters
+    if 4e4 < p0 < 1e5 and -2e3 < p1 < 0 and 0 < p2 < 50 and -0.5 < p3 < 0.5 and 0 < p4 < 1e-3 and 0 < amp < 2 and 50 < maxfreq < 90 and 3 < sighi < 10: # uniform priors used for now
+        return 0.0 # corresponds to probability of 1
+    return -np.inf # corresponds to probability of 0
 
-def log_probability(theta, freq, tant):
+def log_probability(theta, freq, tant): # combining likelihood and priors
     lp = log_prior(theta)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood(theta, tant)
+    return lp + log_likelihood(theta, freq, tant)
 
 
-pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8)
-nwalkers, ndim = pos.shape
+pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8) # initial values of model parameters
+nwalkers, ndim = pos.shape # number of walkers, and dimensions of sampler
 
-n_steps = 2000
+n_steps = 2000 # number of steps for mcmc
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freqfull, tant))
-sampler.run_mcmc(pos, n_steps, progress=True)
-
-fig, axes = plt.subplots(8, figsize=(10, 8), sharex=True)
+sampler.run_mcmc(pos, n_steps, progress=True) # runs mcmc; set progress = False for no readout
 samples = sampler.get_chain()
-labels = ["a0","a1","a2","a3","a4","freq","amp","sigma"]
-for i in range(ndim):
-    ax = axes[i]
-    ax.plot(samples[:, :, i], "k", alpha=0.3)
-    ax.set_xlim(0, len(samples))
-plt.savefig("21cm_burnin.png")
 
-"""
-nll = lambda *args: -log_likelihood(*args)
-initial = np.array([1e-15,1e-15,1e-15,1e-15,1e-15, 2, 7, 1])
-soln = minimize(nll, initial, args=(tant))
-tmod = soln.x
-print(tmod)
-"""
-flat_samples = sampler.get_chain(discard=1000, thin=3, flat=True)
-fig = corner.corner(flat_samples,labels=labels)
-plt.savefig("21cm_cornerplot.png")
+if savefullchain == True:
+    np.savetxt("fullchain.txt", samples)
 
-ff = freqfull
-s_inds = np.random.randint(len(flat_samples), size=100)
-plt.figure()
-plt.plot(freqfull, simsig, 'k', label = 'truth')
-for i in s_inds:
-    sp = flat_samples[i]
-    model = sp[0] + sp[1]*ff + sp[2]*ff**2 + sp[3]*ff**3 + sp[4]*ff**4 -gaussian(ff, sp[6], sp[5], sp[7])
-    plt.plot(freqfull, model, "g", alpha=0.1)
-plt.legend()
-plt.xlabel("Frequency [MHz]")
-plt.ylabel("Temp [K]")
-plt.savefig("21cm_mcmcfit.png")
+if plotburnin == True:
+    fig, axes = plt.subplots(8, figsize=(10, 8), sharex=True) # plotting step-by-step progress of mcmc
+    labels = ["a0","a1","a2","a3","a4","freq","amp","sigma"]
+    for i in range(ndim):
+        ax = axes[i]
+        ax.plot(samples[:, :, i], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+    if saveburnin == True:
+        plt.savefig("21cm_burnin.png")
+
+flat_samples = sampler.get_chain(discard=1000, thin=3, flat=True) # flattened chain; discard burn-in values and thin chain
+
+if saveflatchain == True: # save .txt of flat chain with above parameters
+    np.savetxt("flatchain.txt", flat_samples)
+  
+if plotcorner == True: # corner plot for above mcmc
+    fig = corner.corner(flat_samples,labels=labels)
+    if savecorner == True:
+        plt.savefig("21cm_cornerplot.png")
+
+
+if plotmodels == True: # plot models vs simulated data for 100 random points in chain
+    ff = freqfull
+    s_inds = np.random.randint(len(flat_samples), size=100)
+    plt.figure() 
+    plt.plot(freqfull, simsig, 'k', label = 'truth')
+    for i in s_inds:
+        sp = flat_samples[i]
+        model = sp[0] + sp[1]*ff + sp[2]*ff**2 + sp[3]*ff**3 + sp[4]*ff**4 -gaussian(ff, sp[6], sp[5], sp[7])
+        plt.plot(freqfull, model, "g", alpha=0.1)
+    plt.legend()
+    plt.xlabel("Frequency [MHz]")
+    plt.ylabel("Temp [K]")
+    if savemodels == True:
+        plt.savefig("21cm_modelsplot.png")
 
 
