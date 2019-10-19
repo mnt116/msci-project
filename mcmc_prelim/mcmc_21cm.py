@@ -84,15 +84,17 @@ def log_likelihood(theta, freq, tant): # log likelihood function for model param
     T_f = np.sum(ctp,(1)) # model foreground temperature
     T_hi = amp*np.exp(- (freq-maxfreq)**2 / (2*sighi**2)) # model 21cm temperature
     model = T_f + T_hi # total model temperature
-    coeff = 1/(np.sqrt(2*pi*sighi**2))
+    int_time = 16
+    sig_therm = tant/(np.sqrt((freq[1]-freq[0])*int_time))
+    coeff = 1/(np.sqrt(2*pi*sig_therm**2))
     numerator = (tant - model)**2 # likelihood depends on difference between model and observed temperature in each frequency bin
-    denominator = 2*sighi**2
+    denominator = 2*sig_therm**2
     lj = coeff*np.exp(-numerator/denominator) 
     return np.sum(np.log(lj)) # sum over all frequency bins
 
 def log_prior(theta): # defines (uniform) priors for model parameters theta
     p0, p1, p2, p3, p4, amp, maxfreq, sighi = theta # theta takes form of array of model parameters
-    if 4e4 < p0 < 1e5 and -2e3 < p1 < 0 and 0 < p2 < 50 and -0.5 < p3 < 0.5 and 0 < p4 < 1e-3 and 0 < amp < 2 and 50 < maxfreq < 90 and 3 < sighi < 10: # uniform priors used for now
+    if -1e5 < p0 < 1e5 and -4e4 < p1 < 4e4 and -500 < p2 < 500 and -100 < p3 < 100 and -100 < p4 < 100 and -100 < amp < 100 and 0 < maxfreq < 1000 and 1 < sighi < 1000: # uniform priors used for now
         return 0.0 # corresponds to probability of 1
     return -np.inf # corresponds to probability of 0
 
@@ -106,7 +108,7 @@ def log_probability(theta, freq, tant): # combining likelihood and priors
 pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8) # initial values of model parameters
 nwalkers, ndim = pos.shape # number of walkers, and dimensions of sampler
 
-n_steps = 2000 # number of steps for mcmc
+n_steps = 40000 # number of steps for mcmc
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freqfull, tant))
 sampler.run_mcmc(pos, n_steps, progress=True) # runs mcmc; set progress = False for no readout
@@ -125,7 +127,7 @@ if plotburnin == True:
     if saveburnin == True:
         plt.savefig("21cm_burnin.png")
 
-flat_samples = sampler.get_chain(discard=1000, thin=3, flat=True) # flattened chain; discard burn-in values and thin chain
+flat_samples = sampler.get_chain(discard=15000, thin=15, flat=True) # flattened chain; discard burn-in values and thin chain
 
 if saveflatchain == True: # save .txt of flat chain with above parameters
     np.savetxt("flatchain.txt", flat_samples)
