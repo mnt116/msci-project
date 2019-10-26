@@ -25,6 +25,11 @@ savemodels = False # save plot of models vs simulated data as 21cm_modelsplot.pn
 savefullchain = False # choose whether or not to save full mcmc chain to fullchain.txt
 saveflatchain = False # choose whether or not to save flattened, thinned chain to flatchain.txt (parameters for discard and thin are set below)
 
+# MCMC VALUES
+n_steps = 500000 # number of steps for mcmc
+discardval = 15000 # number of steps to be discarded
+thinval = 15 # thinning of mcmc chain
+
 # importing modules
 from math import pi
 import numpy as np
@@ -104,18 +109,14 @@ def log_probability(theta, freq, tant): # combining likelihood and priors
         return -np.inf
     return lp + log_likelihood(theta, freq, tant)
 
-
 pos = np.array([a0,a1,a2,a3,a4,0.5,78,8.6]) + 1e-4*np.random.randn(32,8) # initial values of model parameters
 nwalkers, ndim = pos.shape # number of walkers, and dimensions of sampler
-
-n_steps = 40000 # number of steps for mcmc
 
 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability, args=(freqfull, tant))
 sampler.run_mcmc(pos, n_steps, progress=True) # runs mcmc; set progress = False for no readout
 samples = sampler.get_chain()
 
-if savefullchain == True:
-    np.savetxt("fullchain.txt", samples)
+
 
 if plotburnin == True:
     fig, axes = plt.subplots(8, figsize=(10, 8), sharex=True) # plotting step-by-step progress of mcmc
@@ -127,7 +128,7 @@ if plotburnin == True:
     if saveburnin == True:
         plt.savefig("21cm_burnin.png")
 
-flat_samples = sampler.get_chain(discard=15000, thin=15, flat=True) # flattened chain; discard burn-in values and thin chain
+flat_samples = sampler.get_chain(discard=discardval, thin=thinval, flat=True) # flattened chain; discard burn-in values and thin chain
 
 if saveflatchain == True: # save .txt of flat chain with above parameters
     np.savetxt("flatchain.txt", flat_samples)
@@ -136,7 +137,6 @@ if plotcorner == True: # corner plot for above mcmc
     fig = corner.corner(flat_samples,labels=labels)
     if savecorner == True:
         plt.savefig("21cm_cornerplot.png")
-
 
 if plotmodels == True: # plot models vs simulated data for 100 random points in chain
     ff = freqfull
