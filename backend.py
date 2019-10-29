@@ -5,8 +5,10 @@ Created on Fri Oct 25 13:22:27 2019
 @author: matth
 """
 
+# The backend for the 21cm mcmc fitting program
+
 # importing modules
-from math import pi
+from math import pi, floor, log
 import numpy as np
 import matplotlib.pyplot as plt
 import emcee
@@ -58,7 +60,7 @@ def log_likelihood(theta, freq, simulated): # log likelihood function for model 
 
 def log_prior(theta): # defines (uniform) priors for model parameters theta
     a0, a1, a2, a3, a4, amp, maxfreq, sigma_hi = theta # theta takes form of array of model parameters
-    if -1e5 < a0 < 1e5 and -4e4 < a1 < 4e4 and -500 < a2 < 500 and -100 < a3 < 100 and -100 < a4 < 100 and -100 < amp < 100 and 0 < maxfreq < 1000 and 1 < sigma_hi < 1000: # uniform priors used for now
+    if -1e5 < a0 < 1e5 and -4e4 < a1 < 4e4 and -500 < a2 < 500 and -100 < a3 < 100 and -100 < a4 < 100 and -1000 < amp < 1000 and 0 < maxfreq < 1000 and 1 < sigma_hi < 1000: # uniform priors used for now
         return 0.0 # corresponds to probability of 1
     return -np.inf # corresponds to probability of 0
 
@@ -71,9 +73,12 @@ def log_probability(theta, freq, simulated): # combining likelihood and priors
 
 # mcmc fitting
     
-def run_mcmc(pos, n_steps, nwalkers, ndim, function, freq, simulated, doprogress = True):
+def run_mcmc(pos, n_steps, function, freq, simulated, doprogress = True):
+    rand = 0.3*pos*np.random.randn(32,len(pos))
+    pos1 = pos+rand
+    nwalkers, ndim = pos1.shape # number of walkers, and dimensions of sampler
     sampler = emcee.EnsembleSampler(nwalkers, ndim, function, args=(freq, simulated))
-    sampler.run_mcmc(pos, n_steps, progress=doprogress) 
+    sampler.run_mcmc(pos1, n_steps, progress=doprogress) 
     print("Acceptance Fraction:", np.mean(sampler.acceptance_fraction))
     #print("Autocorrelation Time", np.mean(sampler.get_autocorr_time()))
     return sampler
@@ -128,6 +133,7 @@ def plotmodels(freq, sim_signal, flatchain, size, save=False): # plot models vs 
     s_inds = np.random.randint(len(flatchain), size=size)
     plt.figure() 
     plt.plot(freq, sim_signal.full(), 'k', label = 'truth')
+    int_time = sim_signal.getinttime()
     for i in s_inds:
         sp = flatchain[i]
         coeffs = sp[0:-3]
@@ -145,6 +151,7 @@ def plotsigmodels(freq, sim_signal, flatchain, size, save=False): # plot models 
     s_inds = np.random.randint(len(flatchain), size=size)
     plt.figure() 
     plt.plot(freq, sim_signal.absorption(), 'k', label = 'truth')
+    int_time = sim_signal.getinttime()
     for i in s_inds:
         sp = flatchain[i]
         coeffs = sp[0:-3]
