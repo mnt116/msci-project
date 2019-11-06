@@ -20,7 +20,7 @@ a4 = 0.0006102144740830822
 sim_coeffs = np.array([a0,a1,a2,a3,a4]) # simulated foreground coeffs
 
 # creating simulated 21cm data
-sim_amp = 300 # amplitude
+sim_amp = 0.5 # amplitude
 sim_maxfreq = 78 # centre i.e. peak frequency
 sim_sigma_hi = 8.1 # width
 
@@ -31,13 +31,20 @@ freqfull = np.linspace(51.965332, 97.668457, 50) # frequency linspace
 sim_data = be.signal(freqfull, sim_coeffs, sim_maxfreq, sim_amp, sim_sigma_hi, int_time)
 
 pos = np.array([a0,a1,a2,a3,a4,78,0.5,8.6]) # initial values of model parameters
-
+prior_list = [[-1e5,1e5],
+              [-4e4,4e4],
+              [-500,500],
+              [-100,100],
+              [-100,100],
+              [-1000,1000],
+              [0,1000],
+              [0,1000]]
 n_steps = 500 # number of steps for mcmc
 n_walkers = 500 # number of walkers for ensemble sampler
 
 function = be.log_probability # function used to compute log probability
 
-mcmc = be.run_mcmc(pos, n_steps, n_walkers, function, freqfull, sim_data) # mcmc chain object
+mcmc = be.run_mcmc(pos, n_steps, n_walkers, function, freqfull, sim_data, prior_list) # mcmc chain object
 chain = mcmc.get_chain() # unflattened chain
 flatchain = mcmc.get_chain(discard=120, thin=15, flat=True) # flattened, thinned chain with burn-in discarded
 

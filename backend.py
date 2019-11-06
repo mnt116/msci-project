@@ -38,6 +38,17 @@ class signal: # class to define a signal
         pwrs = np.power(freq_arr, p)
         ctp = self.___coeffs*pwrs
         return np.sum(ctp,(1)) 
+    
+    def log_foreground(self): # alternative foreground using log-polynomial
+        l = len(self.___coeffs)
+        p = np.arange(0,l,1)
+        freq_arr = np.transpose(np.multiply.outer(np.full(l,1), self.___freq))
+        logs = np.log(freq_arr)
+        pwrs = np.power(logs, p)
+        ctp = self.___coeffs*pwrs
+        log_t =  np.sum(ctp,(1))
+        return np.exp(log_t)
+    
 
     def thermal_noise(self): # defines thermal noise for a given temperature array, specifying width of frequency bin and integration time
         return self.foreground()/(np.sqrt((self.___freq[1]-self.___freq[0])*(self.___int_time)))
@@ -58,14 +69,16 @@ def log_likelihood(theta, freq, simulated): # log likelihood function for model 
     lj = coeff*np.exp(-numerator/denominator) 
     return np.sum(np.log(lj)) # sum over all frequency bins
 
-def log_prior(theta): # defines (uniform) priors for model parameters theta
-    a0, a1, a2, a3, a4, amp, maxfreq, sigma_hi = theta # theta takes form of array of model parameters
-    if -1e5 < a0 < 1e5 and -4e4 < a1 < 4e4 and -500 < a2 < 500 and -100 < a3 < 100 and -100 < a4 < 100 and -1000 < amp < 1000 and 0 < maxfreq < 1000 and 1 < sigma_hi < 1000: # uniform priors used for now
-        return 0.0 # corresponds to probability of 1
-    return -np.inf # corresponds to probability of 0
+    
+def log_prior(theta, prior_list): # defines (uniform) priors for model parameters theta
+     # theta takes form of array of model parameters
+    for i in range(len(theta)):
+        if theta[i] < prior_list[i][0] or theta[i] > prior_list[i][1]: # uniform priors used for now
+            return -np.inf # corresponds to probability of 0
+    return 0 # corresponds to probability of 1
 
-def log_probability(theta, freq, simulated): # combining likelihood and priors
-    lp = log_prior(theta)
+def log_probability(theta, freq, simulated, prior_list): # combining likelihood and priors
+    lp = log_prior(theta, prior_list)
     if not np.isfinite(lp):
         return -np.inf
     return lp + log_likelihood(theta, freq, simulated)
@@ -73,11 +86,11 @@ def log_probability(theta, freq, simulated): # combining likelihood and priors
 
 # mcmc fitting
     
-def run_mcmc(pos, n_steps, n_walkers, function, freq, simulated, doprogress = True):
+def run_mcmc(pos, n_steps, n_walkers, function, freq, simulated, prior_list, doprogress = True):
     rand = 0.3*pos*np.random.randn(n_walkers,len(pos))
     pos1 = pos+rand
     nwalkers, ndim = pos1.shape # number of walkers, and dimensions of sampler
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, function, args=(freq, simulated))
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, function, args=(freq, simulated, prior_list))
     sampler.run_mcmc(pos1, n_steps, progress=doprogress) 
     print("Acceptance Fraction:", np.mean(sampler.acceptance_fraction))
     #print("Autocorrelation Time", np.mean(sampler.get_autocorr_time()))
