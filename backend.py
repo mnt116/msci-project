@@ -8,7 +8,7 @@ Created on Fri Oct 25 13:22:27 2019
 # The backend for the 21cm mcmc fitting program
 
 # importing modules
-from math import pi, floor, log
+from math import pi
 import numpy as np
 import matplotlib.pyplot as plt
 import emcee
@@ -16,45 +16,32 @@ import corner
 
 # defining signal
 
-class signal: # class to define a signal
-    def __init__(self, freq, coeffs, maxfreq, amp, sigma_hi, int_time):
-        self.___freq = freq
-        self.___coeffs = coeffs
-        self.___maxfreq = maxfreq
-        self.___amp = amp
-        self.___sigma_hi = sigma_hi
-        self.___int_time = int_time
+def absorption(freq, maxfreq, amp, sigma_hi): # signal 21cm absorption dip, defined as a negative gaussian
+    return -amp*np.exp((-(freq-maxfreq)**2)/(2*sigma_hi**2))
     
-    def getinttime(self):
-        return self.___int_time
-    
-    def absorption(self): # signal 21cm absorption dip, defined as a negative gaussian
-        return -self.___amp*np.exp((-(self.___freq-self.___maxfreq)**2)/(2*self.___sigma_hi**2))
-    
-    def foreground(self): # signal foreground
-        l = len(self.___coeffs)
-        p = np.arange(0,l,1)
-        freq_arr = np.transpose(np.multiply.outer(np.full(l,1), self.___freq))
-        pwrs = np.power(freq_arr, p)
-        ctp = self.___coeffs*pwrs
-        return np.sum(ctp,(1)) 
+def foreground(freq, coeffs, int_time): # signal foreground
+    l = len(coeffs)
+    p = np.arange(0,l,1)
+    freq_arr = np.transpose(np.multiply.outer(np.full(l,1), freq))
+    pwrs = np.power(freq_arr, p)
+    ctp = coeffs*pwrs
+    return np.sum(ctp,(1)) 
 
-    def thermal_noise(self): # defines thermal noise for a given temperature array, specifying width of frequency bin and integration time
-        return self.foreground()/(np.sqrt((self.___freq[1]-self.___freq[0])*(self.___int_time)))
-
-    def full(self): # full signal inc. foreground, 21cm and noise
-        return self.absorption() + self.foreground() + self.thermal_noise()
-
+"""
+def thermal_noise(freq, temp, int_time): # defines thermal noise for a given temperature array, specifying width of frequency bin and integration time
+    return temp/(np.sqrt((freq[1]-freq[0])*(int_time)))
+"""
 # defining log probability
     
-def log_likelihood(theta, freq, simulated): # log likelihood function for model parameters theta, simulated data, and model data
+def log_likelihood(theta, freq, simulated, int_time): # log likelihood function for model parameters theta, simulated data, and model data
     a0, a1, a2, a3, a4, maxfreq, amp, sigma_hi = theta # theta takes form of array of model parameters
     coeffs = [a0,a1,a2,a3,a4]
-    model = signal(freq, coeffs, maxfreq, amp, sigma_hi, int_time=simulated.getinttime())
-    sig_therm = model.thermal_noise()
-    coeff = 1/(np.sqrt(2*pi*sig_therm**2))
+    no_noise = foreground(freq, coeffs, int_time) + absorption(freq, maxfreq, amp, sigma_hi)
+    model_noise = thermal_noise(freq, no_noise, int_time)
+    model = no_noise + model_noise
+    coeff = 1/(np.sqrt(2*pi*model_noise**2))
     numerator = (simulated.full() - model.full())**2 # likelihood depends on difference between model and observed temperature in each frequency bin
-    denominator = 2*sig_therm**2
+    denominator = 2*model_noise**2
     lj = coeff*np.exp(-numerator/denominator) 
     return np.sum(np.log(lj)) # sum over all frequency bins
 
@@ -147,10 +134,10 @@ def plotmodels(freq, sim_signal, flatchain, size, save=False): # plot models vs 
     if save == True:
         plt.savefig("21cm_modelsplot.png")
 
-def plotsigmodels(freq, sim_signal, flatchain, size, save=False): # plot models vs simulated data for 100 random points in chain
+def plotsigmodels(freq, sim_abs, flatchain, size, save=False): # plot models vs simulated data for 100 random points in chain
     s_inds = np.random.randint(len(flatchain), size=size)
     plt.figure() 
-    plt.plot(freq, sim_signal.absorption(), 'k', label = 'truth')
+    plt.plot(freq, sim_abs, 'k', label = 'truth')
     int_time = sim_signal.getinttime()
     for i in s_inds:
         sp = flatchain[i]
