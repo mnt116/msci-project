@@ -32,13 +32,14 @@ sim_data = be.signal(freqfull, sim_coeffs, sim_maxfreq, sim_amp, sim_sigma_hi, i
 
 pos = np.array([a0,a1,a2,a3,a4,78,0.5,8.6]) # initial values of model parameters
 
-n_steps = 5000 # number of steps for mcmc
+n_steps = 500 # number of steps for mcmc
+n_walkers = 500 # number of walkers for ensemble sampler
 
 function = be.log_probability # function used to compute log probability
 
-mcmc = be.run_mcmc(pos, n_steps, function, freqfull, sim_data) # mcmc chain object
+mcmc = be.run_mcmc(pos, n_steps, n_walkers, function, freqfull, sim_data) # mcmc chain object
 chain = mcmc.get_chain() # unflattened chain
-flatchain = mcmc.get_chain(discard=1200, thin=15, flat=True) # flattened, thinned chain with burn-in discarded
+flatchain = mcmc.get_chain(discard=120, thin=15, flat=True) # flattened, thinned chain with burn-in discarded
 
 labels = ["a0","a1","a2","a3","a4","freq","amp","sigma"] # labels for plot
 

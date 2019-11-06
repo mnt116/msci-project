@@ -8,7 +8,7 @@ Created on Fri Oct 25 13:22:27 2019
 # The backend for the 21cm mcmc fitting program
 
 # importing modules
-from math import pi, floor, log
+from math import pi
 import numpy as np
 import matplotlib.pyplot as plt
 import emcee
@@ -73,8 +73,8 @@ def log_probability(theta, freq, simulated): # combining likelihood and priors
 
 # mcmc fitting
     
-def run_mcmc(pos, n_steps, function, freq, simulated, doprogress = True):
-    rand = 0.3*pos*np.random.randn(32,len(pos))
+def run_mcmc(pos, n_steps, n_walkers, function, freq, simulated, doprogress = True):
+    rand = 0.3*pos*np.random.randn(n_walkers,len(pos))
     pos1 = pos+rand
     nwalkers, ndim = pos1.shape # number of walkers, and dimensions of sampler
     sampler = emcee.EnsembleSampler(nwalkers, ndim, function, args=(freq, simulated))
