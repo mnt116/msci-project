@@ -44,14 +44,14 @@ n_walkers = 500 # number of walkers for ensemble sampler
 
 function = be.log_probability # function used to compute log probability
 
-mcmc = be.run_mcmc(pos, n_steps, n_walkers, function, freqfull, sim_data, prior_list) # mcmc chain object
+mcmc = be.run_mcmc(pos, n_steps, n_walkers, function, sim_data, prior_list) # mcmc chain object
 chain = mcmc.get_chain() # unflattened chain
 flatchain = mcmc.get_chain(discard=120, thin=15, flat=True) # flattened, thinned chain with burn-in discarded
 
 labels = ["a0","a1","a2","a3","a4","freq","amp","sigma"] # labels for plot
 
-be.plotsimdata(freqfull, sim_data, save=False)
+be.plotsimdata(sim_data, save=False)
 be.plotburnin(chain, labels)
 be.plotcorner(flatchain, labels)
-be.plotmodels(freqfull, sim_data, flatchain, 100)
-be.plotsigmodels(freqfull, sim_data, flatchain, 100)
+be.plotmodels(sim_data, flatchain, 100)
+be.plotsigmodels(sim_data, flatchain, 100)
