@@ -775,7 +775,7 @@ class freenoise_logpoly_plus_gaussian(bmc.model):
         """
         Log polynomial foreground up to 4th order
         """
-        freq_0 = 75 
+        freq_0 = 75
         coeffs = theta[0:-4]
         l = len(coeffs)
         p = np.arange(0,l,1)
@@ -792,7 +792,7 @@ class freenoise_logpoly_plus_gaussian(bmc.model):
         amp = theta[-4]
         x0 = theta[-3]
         width = theta[-2]
-        
+
         t21 = -amp*np.exp((-4*np.log(2)*(self.freq-x0)**2)/(width**2))
 
         return t21
@@ -967,7 +967,7 @@ class freenoise_sims_sine(bmc.model):
     Model used by Sims in 2019
 
     Requires parameters in form
-    theta = [a0, a1, a2, a3, a4, acal0, acal1, b, P, amp, x0, width, tau]
+    theta = [a0, a1, a2, a3, a4, acal0, acal1, b, P, amp, x0, width, tau, noise]
     """
 
     def __init__(self, freq):
